@@ -62,7 +62,7 @@ canop_int_coll = ee.ImageCollection("CAS/IGSNRR/PML/V2").filterDate(start_date, 
 
 
 # Get static Soil Water Holding Capacity grid (manually uploaded as GEE asset)
-whc_grid = ee.Image('users/darin_EE/whc3_1mwgs250m.tif')
+whc_grid = ee.Image('users/darin_EE/whc3_1mwgs250m')
 
 ndvi_daily = interpolate.daily(precip_coll, ndvi_coll)
 pet_daily = daily_aggregate.aggregate_to_daily(pet_coll, start_date, end_date)
