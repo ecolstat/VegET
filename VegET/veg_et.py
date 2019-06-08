@@ -15,8 +15,8 @@ ee.Initialize()
 # Define date range
 # TODO: this needs a check to ensure the dates are within the ranges for the imageCollections
 #    accounting for the extra dates added for interpolation
-start_date = ee.Date('2003-01-01')
-end_date = ee.Date('2007-12-01')
+start_date = ee.Date('2003-04-01')
+end_date = ee.Date('2003-11-01')
 
 # TODO: needs a check to ensure spatial overlap between this and imageCollections
 # TODO: add ability to include shapefiles or manually defined coordinates
@@ -49,12 +49,13 @@ precip_coll = ee.ImageCollection('IDAHO_EPSCOR/GRIDMET').filterDate(start_date, 
     .map(lambda f: f.clip(polygon))
 
 # Get Potential ET imageCollection
+# TODO: Band is hardcoded to 'PotEvap_tavg'. Needs to be generalized.
 pet_coll =  ee.ImageCollection("NASA/GLDAS/V021/NOAH/G025/T3H").filterDate(start_date, end_date)\
     .select('PotEvap_tavg').filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
     .map(lambda f: f.clip(polygon))
 
 # Specify canopy intercept image or imageCollection
-# TODO: Band is hardcoded to Ei for intercept.
+# TODO: Band is hardcoded to 'Ei' for intercept. Needs to be generalized.
 canop_int_coll = ee.ImageCollection("CAS/IGSNRR/PML/V2").filterDate(start_date, end_date)\
     .select('Ei').filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
     .map(lambda f: f.clip(polygon))
@@ -65,12 +66,19 @@ whc_grid = ee.Image('users/darin_EE/whc3_1mwgs250m.tif')
 
 ndvi_daily = interpolate.daily(precip_coll, ndvi_coll)
 pet_daily = daily_aggregate.aggregate_to_daily(pet_coll, start_date, end_date)
+# TODO: As is, this needs to be run individually since interpolate.py takes only the first band of the
+#    target image. Generalize interpolate to be able to extract multiple bands to allow for passing in
+#    a previously interpolated collection.
+canInt_daily = interpolate.daily(precip_coll, canop_int_coll)
 
 ndvi_daily = ee.ImageCollection(ndvi_daily.map(utils.add_date_band))
 pet_daily = ee.ImageCollection(pet_daily.map(utils.add_date_band))
+canInt_daily = ee.ImageCollection(canInt_daily.map(utils.add_date_band))
 
 # Merge images to new ImageCollection as bands by date
 merged_coll = utils.merge_colls(ndvi_daily, pet_daily, bands_2_add = 'PotEvap_tavg')
+merged_coll = utils.merge_colls(merged_coll, canInt_daily, bands_2_add = 'Ei')
+
 
 #if __name__ == '__main__':
 #    pass
