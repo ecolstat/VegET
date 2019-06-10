@@ -11,20 +11,22 @@ ee.Initialize()
 
 
 
-def vegET_model(daily_image, whc_grid_img):
+def vegET_model(daily_imageColl, whc_grid_img, start_date):
     """
     Calculate Daily Soil Water Index (SWI)
-    :param daily_image: ee.Image
-        Daily image with bands for ndvi, precip, pet, canopy intercept
+    :param start_date: ee.Date
+        First date for analysis. Used to calculate initial SWI and then removed from collection.
+    :param daily_imageColl: ee.ImageCollection
+        Collection of daily images with bands for ndvi, precip, pet, canopy intercept
     :param whc_grid_img: ee.Image
         Static water holding capacity image
-    :return: ee.Image
-        image of daily Soil Water Index
+    :return: ee.ImageCollection
+        imageCollection of daily Soil Water Index
     """
     # TODO: Verify if these should be user inputs
     # Define constant variables
-    VARA = 1.25
-    VARB = 0.2
+    VARA = ee.Number(1.25)
+    VARB = ee.Number(0.2)
 
     # DS: moved to swi initial calculations. If that works, delete these
     # Get the date for daily_image
@@ -56,8 +58,6 @@ def vegET_model(daily_image, whc_grid_img):
 
         return ee.Image(effppt)
 
-    effect_ppt = effec_precip(daily_image)
-
     #    DS: This doesn't appear to be used in the demo model
     #    def intercepted_precip(image):
     #        """
@@ -78,31 +78,32 @@ def vegET_model(daily_image, whc_grid_img):
     #
     #        return ee.Image(intppt)
 
-    def swi_init_calc(whc_img, effective_ppt):
+    def swi_init_calc(whc_img):
         """
-        Calculate soil water index initial value
+        Calculate soil water index initial value. Effective precip is added in daily_swi_calc().
+
+        :param effect_ppt_init: ee.Image
+            Initial effective precipitation as calculated in effec_precip()
         :param whc_img: ee.Image
             Static image of water holding capacity
-        :param effective_ppt: ee.Image
-            Effective precipitation as calculated in effec_precip()
+
         :return: ee.Image
-            Soil water index
+            Soil water index for the first day
         """
-        swi = whc_img.multiply(0.5).add(effective_ppt)
+        swi_init = whc_img.multiply(0.5)
 
-        swi = swi.set('system:time_start', effective_ppt.get('system:time_start'))
+        swi_init = swi_init.set('system:time_start', effect_ppt_init.get('system:time_start'))
+        return ee.Image(swi_init)
 
-        return ee.Image(swi)
+    swi_init = swi_init_calc(whc_grid_img)
 
-    swi_init = swi_init_calc(whc_grid_img, effect_ppt)
-
-    # Create empty list for imageCollection.iterate()
-    first_day = ee.List([
+    # Create SWI list for imageCollection.iterate()
+    swi_list = ee.List([
         ee.Image(swi_init).set('system:time_start', swi_init.get('system:time_start')).select([0], ['SWI'])
     ])
 
 
-    def daily_swi_calc(swi_list, whc_image, daily_image):
+    def daily_swi_calc(daily_image, swi_list):
         """
         Function to run imageCollection.iterate(). Takes latest value from swi_list as previous
             time-step SWI, current day whc_image and daily_image
@@ -111,6 +112,11 @@ def vegET_model(daily_image, whc_grid_img):
         :param daily_image:
         :return:
         """
+        prev_swi = ee.Image(ee.List(swi_list).get(-1))
+
+        effective_precip = effec_precip(daily_image)
+
+        swi_current = ee.Image(prev_swi.add(effective_precip))
 
         def rfi_calc(image1, image2):
             """
@@ -132,27 +138,27 @@ def vegET_model(daily_image, whc_grid_img):
 
             return ee.Image(rfi)
 
-        rfi = rfi_calc(swi, whc_grid_img)
+        rfi = rfi_calc(swi_current, whc_grid_img)
 
-        def eta_calc(image):
-            """
-            Calculate effective precipitation
-            :param image: ee.Image
-                Image with precip and intercept bands
+        etasw1A = ee.Image(daily_image.select('NDVI').multiply(VARA).add(VARB)).multiply(daily_image.select(
+            'PotEvap_tavg'))
+        etasw1B = ee.Image(daily_image.select('NDVI').multiply(VARA).multiply(daily_image.select('PotEvap_tavg')))
 
-            :return: ee.Image
-                Effective precipitation accounting for canopy intercept
-            """
+        # DS This may fail since it's calling on values in multiple images
+        etasw1 = etasw1A.where(daily_image.select('NDVI').gt(0.4), etasw1B)
 
-            effppt = image.expression(
-                'PRECIP * (1 - (INTERCEPT/100))', {
-                    'PRECIP': image.select('pr'),
-                    'INTERCEPT': image.select('Ei')
-                }
-            )
+        etasw2 = etasw1.multiply(swi_current.divide(whc_grid_img.multiply(0.5)))
+        etasw3 = etasw1.where(swi_current.gt(whc_grid_img.multiply(0.5)), etasw2)
+        etasw4 = swi_current.where(etasw3.gt(swi_current), etasw3)
+        etasw = whc_grid_img.where(etasw4.gt(whc_grid_img), etasw4)
 
-            effppt = effppt.set('system:time_start', image.get('system:time_start'))
+        swf1 = swi_current.subtract(etasw)
+        whc_diff = ee.Image(whc_grid_img.subtract(etasw))
 
-            return ee.Image(effppt)
+        swf = whc_diff.where(swi_current.gt(whc_grid_img), ee.Image(0.0).where(swf1.gt(0.0), swf1))
+
+        return ee.List(swi_list).add(swf)
+
+
 
 
