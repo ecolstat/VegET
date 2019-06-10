@@ -92,7 +92,7 @@ def vegET_model(daily_imageColl, whc_grid_img, start_date):
         """
         swi_init = whc_img.multiply(0.5)
 
-        swi_init = swi_init.set('system:time_start', effect_ppt_init.get('system:time_start'))
+        swi_init = swi_init.set('system:time_start', daily_imageColl.first().get('system:time_start'))
         return ee.Image(swi_init)
 
     swi_init = swi_init_calc(whc_grid_img)

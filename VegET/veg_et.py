@@ -4,7 +4,8 @@ Main file for running VegET model.
 """
 
 from VegET import interpolate, daily_aggregate, utils
-
+import cartoee as cee
+import matplotlib.pyplot as plt
 import ee
 
 ee.Initialize()
