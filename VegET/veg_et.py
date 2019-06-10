@@ -43,11 +43,15 @@ ndvi_coll = ee.ImageCollection("MODIS/006/MOD13Q1").filterDate(start_date, end_d
     .select('NDVI').filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
     .map(lambda f: f.clip(polygon))
 
+# TODO: Switch to 8day ndvi
+
+
 # Get daily climate dataset
 # TODO: band is hardcoded to precipitation
 precip_coll = ee.ImageCollection('IDAHO_EPSCOR/GRIDMET').filterDate(start_date, end_date)\
     .select('pr').filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
     .map(lambda f: f.clip(polygon))
+# TODO: bring in pet from gridmet
 
 # Get Potential ET imageCollection
 # TODO: Band is hardcoded to 'PotEvap_tavg'. Needs to be generalized.
@@ -80,6 +84,7 @@ canInt_daily = ee.ImageCollection(canInt_daily.map(utils.add_date_band))
 merged_coll = utils.merge_colls(ndvi_daily, pet_daily, bands_2_add = 'PotEvap_tavg')
 merged_coll = utils.merge_colls(merged_coll, canInt_daily, bands_2_add = 'Ei')
 
+# TODO: add in snowmelt
 
 #if __name__ == '__main__':
 #    pass
