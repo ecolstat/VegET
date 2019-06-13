@@ -31,7 +31,6 @@ def vegET_model(daily_imageColl, whc_grid_img, start_date):
     # DS: moved to swi initial calculations. If that works, delete these
     # Get the date for daily_image
     #time0 = daily_image.first().get('system:time_start')
-
     # Create empty list for swi images to store results of iterate()
     #first_day = ee.List([
     #    ee.Image(0).set('system:time_start', time0).select([0], ['SWI'])
@@ -78,7 +77,8 @@ def vegET_model(daily_imageColl, whc_grid_img, start_date):
     #
     #        return ee.Image(intppt)
 
-    def swi_init_calc(whc_img):
+# TODO: Correct the docstring
+    def init_image_calc(whc_img, zeros = True):
         """
         Calculate soil water index initial value. Effective precip is added in daily_swi_calc().
 
@@ -86,16 +86,26 @@ def vegET_model(daily_imageColl, whc_grid_img, start_date):
             Initial effective precipitation as calculated in effec_precip()
         :param whc_img: ee.Image
             Static image of water holding capacity
+        :param zeros: ee.boo
 
         :return: ee.Image
             Soil water index for the first day
         """
-        swi_init = whc_img.multiply(0.5)
 
-        swi_init = swi_init.set('system:time_start', daily_imageColl.first().get('system:time_start'))
-        return ee.Image(swi_init)
+        if zeros:
+            init_image = daily_imageColl.first().constant(0)
+        else:
+            init_image = whc_img.multiply(0.5)
 
-    swi_init = swi_init_calc(whc_grid_img)
+        init_image = init_image.set('system:time_start', daily_imageColl.first().get('system:time_start'))
+        return ee.Image(init_image)
+
+    swi_init = init_image_calc(whc_grid_img, zeros = False)
+    swe_init = init_image_calc(whc_grid_img, zeros = True)
+    snowpack_init = init_image_calc(whc_grid_img, zeros = True)
+# TODO: list needs to be structured such that iterate() can take only one list. Try creating ImageCollection instead
+    #  of images
+
 
     # Create SWI list for imageCollection.iterate()
     swi_list = ee.List([

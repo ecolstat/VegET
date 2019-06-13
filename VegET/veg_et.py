@@ -46,30 +46,46 @@ ndvi_coll = ee.ImageCollection("MODIS/006/MOD09Q1").filterDate(start_date, end_d
 ndvi_coll = ndvi_coll.map(utils.addNDVI)
 ndvi_coll = ndvi_coll.select('NDVI')
 
-# Get daily climate dataset
-# TODO: band is hardcoded to precipitation
-precip_coll = ee.ImageCollection('IDAHO_EPSCOR/GRIDMET').filterDate(start_date, end_date)\
-    .select('pr').filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
+# Get daily climate dataset(prexcip, eto, temp)
+# TODO: band is hardcoded to precipitation and daily ref et (et0 -> grass)
+precip_eto_coll = ee.ImageCollection('IDAHO_EPSCOR/GRIDMET').filterDate(start_date, end_date)\
+    .select('pr', 'eto').filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
     .map(lambda f: f.clip(polygon))
-# TODO: bring in pet from gridmet
 
+# DS: Old version using GLDS. Delete if not needed anymore.
 # Get Potential ET imageCollection
-# TODO: Band is hardcoded to 'PotEvap_tavg'. Needs to be generalized.
-pet_coll =  ee.ImageCollection("NASA/GLDAS/V021/NOAH/G025/T3H").filterDate(start_date, end_date)\
-    .select('PotEvap_tavg').filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
-    .map(lambda f: f.clip(polygon))
+# pet_coll =  ee.ImageCollection("NASA/GLDAS/V021/NOAH/G025/T3H").filterDate(start_date, end_date)\
+#     .select('PotEvap_tavg').filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
+#     .map(lambda f: f.clip(polygon))
+
+# DS: Old version using PML/V2. Delete if not needed anymore.
+# Specify canopy intercept image or imageCollection
+# # DS: Band is hardcoded to 'Ei' for intercept. Needs to be generalized.
+# canop_int_coll = ee.ImageCollection("CAS/IGSNRR/PML/V2").filterDate(start_date, end_date)\
+#     .select('Ei').filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
+#     .map(lambda f: f.clip(polygon))
 
 # Specify canopy intercept image or imageCollection
-# TODO: Band is hardcoded to 'Ei' for intercept. Needs to be generalized.
-canop_int_coll = ee.ImageCollection("CAS/IGSNRR/PML/V2").filterDate(start_date, end_date)\
-    .select('Ei').filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
-    .map(lambda f: f.clip(polygon))
-
+canopy_int = ee.Image('users/darin_EE/VegET/Interception')
 
 # Get static Soil Water Holding Capacity grid (manually uploaded as GEE asset)
-whc_grid = ee.Image('users/darin_EE/whc3_1mwgs250m')
+whc = ee.Image('users/darin_EE/VegET/WaterHoldingCapacity_mm')
 
-ndvi_daily = interpolate.daily(precip_coll, ndvi_coll)
+# Get static Soil Saturation image
+soil_sat = ee.Image('users/darin_EE/VegET/SoilSaturation_mm')
+
+# Get static Field Capacity image
+fcap = ee.Image('users/darin_EE/VegET/FieldCapacity_mm')
+
+# Get initial soil water EEEEEEEE image
+init_swe = ee.Image('users/darin_EE/VegET/SWE_initial')
+
+# Get initial snowpack image
+init_snow_pack = ee.Image('users/darin_EE/VegET/Snowpack_initial')
+
+ndvi_daily = interpolate.daily(precip_eto_coll, ndvi_coll)
+
+# DS: This shouldn't be needed anymore if using eto from gridmet
 pet_daily = daily_aggregate.aggregate_to_daily(pet_coll, start_date, end_date)
 # TODO: As is, this needs to be run individually since interpolate.py takes only the first band of the
 #    target image. Generalize interpolate to be able to extract multiple bands to allow for passing in
