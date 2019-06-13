@@ -11,6 +11,20 @@ import datetime
 import ee
 
 
+def addNDVI(image):
+    """
+    Function for calculating NDVI (used here for 8-day NDVI from preprocessed MODIS Terra 8-day SR)
+    :param image: ee.Image
+        Image with appropriate bands for calculating NDVI
+    :return: ee.Image
+        Image with NDVI band added
+    """
+    # TODO: include checks for identifying sensor and appropriate bands. Now just hardcoded for MODIS
+    # For MODIS
+    ndvi_calc = image.normalizedDifference(['sur_refl_b01', 'sur_refl_b02']).rename('NDVI')
+    return image.addBands(ndvi_calc)
+
+
 def add_date_band(image):
     """
     Some operations require that images in collections have 'time' bands. This function is

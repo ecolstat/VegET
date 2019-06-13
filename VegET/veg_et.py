@@ -39,12 +39,12 @@ g_season_end = 10
 #   and add check to ensure those bands are in the imageCollection, as well as calculations
 #   if necessary from raw bands
 # Get NDVI collection and clip to ROI
-ndvi_coll = ee.ImageCollection("MODIS/006/MOD13Q1").filterDate(start_date, end_date)\
-    .select('NDVI').filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
+# TODO: Check to see if this could be codensed into one call
+ndvi_coll = ee.ImageCollection("MODIS/006/MOD09Q1").filterDate(start_date, end_date)\
+    .filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
     .map(lambda f: f.clip(polygon))
-
-# TODO: Switch to 8day ndvi
-
+ndvi_coll = ndvi_coll.map(utils.addNDVI)
+ndvi_coll = ndvi_coll.select('NDVI')
 
 # Get daily climate dataset
 # TODO: band is hardcoded to precipitation
