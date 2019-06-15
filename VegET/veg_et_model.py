@@ -30,7 +30,7 @@ def init_image_create(ref_img, zeros=True):
     return ee.Image(init_image)
 
 
-def eff_intercept_precip(image):
+def eff_intercept_precip(precip_image, intercept_image):
     """
     Calculate effective precipitation and interception
     :param image: ee.Image
@@ -40,13 +40,13 @@ def eff_intercept_precip(image):
         Image with bands for effective precip and intercepted precip
     """
 
-    effppt = image.expression(
+    effppt = precip_image.expression(
         'PRECIP * (1 - (INTERCEPT/100))', {
-            'PRECIP': image.select('pr'),
-            'INTERCEPT': image.select('intercept')
+            'PRECIP': precip_image.select('pr'),
+            'INTERCEPT': intercept_image.select('intercept')
         }
     )
-    intppt = image.expression(
+    intppt = precip_image.expression(
         'PRECIP * (INTERCEPT/100)', {
             'PRECIP': image.select('pr'),
             'INTERCEPT': image.select('intercept')

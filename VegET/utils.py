@@ -11,20 +11,6 @@ import datetime
 import ee
 
 
-def addNDVI(image):
-    """
-    Function for calculating NDVI (used here for 8-day NDVI from preprocessed MODIS Terra 8-day SR)
-    :param image: ee.Image
-        Image with appropriate bands for calculating NDVI
-    :return: ee.Image
-        Image with NDVI band added
-    """
-    # TODO: include checks for identifying sensor and appropriate bands. Now just hardcoded for MODIS
-    # For MODIS
-    ndvi_calc = image.normalizedDifference(['sur_refl_b01', 'sur_refl_b02']).rename('NDVI')
-    return image.addBands(ndvi_calc)
-
-
 def add_date_band(image):
     """
     Some operations require that images in collections have 'time' bands. This function is
@@ -39,21 +25,40 @@ def add_date_band(image):
         image.select([0]).double().multiply(0).add(date_value.millis()).rename(['time'])])
 
 
-def millis(input_dt):
-    """NOTE: Copied from openet.core.utils.py from 06.04.19 pull
-    Convert datetime to milliseconds since epoch
-
-
-    Parameters
-    ----------
-    input_df : datetime
-
-    Returns
-    -------
-    int
-
+def addNDVI(image):
     """
-    return 1000 * int(calendar.timegm(input_dt.timetuple()))
+    Function for calculating NDVI (used here for 8-day NDVI from preprocessed MODIS Terra 8-day SR)
+    :param image: ee.Image
+        Image with appropriate bands for calculating NDVI
+    :return: ee.Image
+        Image with NDVI band added
+    """
+    # TODO: include checks for identifying sensor and appropriate bands. Now just hardcoded for MODIS
+    # For MODIS
+    ndvi_calc = image.normalizedDifference(['sur_refl_b01', 'sur_refl_b02']).rename('NDVI')
+    return image.addBands(ndvi_calc)
+
+
+def addStaticBands(staticsImg):
+    """
+    Add static images as bands to an imageCollection.
+    :param staticsImg: ee.Image
+        Single image created from multiple static input images
+    :return: ee.Image
+        Image with bands added for static input images
+    """
+    def wrap(image):
+        """
+        addBands to image in main collection.
+        :param image: ee.Image
+            image in main collection to which static bands will be added
+        :return: ee.Image
+            image with bands from the statics image added
+        """
+        newBands = image.addBands(staticsImg)
+        return newBands
+
+    return wrap
 
 
 def date_0utc(date):
@@ -70,6 +75,7 @@ def date_0utc(date):
     return ee.Date.fromYMD(date.get('year'), date.get('month'),
                            date.get('day'))
 
+# TODO: Change to accept unknown number of secondayr_colls and band names as list
 def merge_colls(main_coll, secondary_coll, bands_2_add):
     """
     Function for band-wise merging of multiple ee.ImageCollections
@@ -109,5 +115,19 @@ def merge_colls(main_coll, secondary_coll, bands_2_add):
     return merged_coll
 
 
+def millis(input_dt):
+    """NOTE: Copied from openet.core.utils.py from 06.04.19 pull
+    Convert datetime to milliseconds since epoch
 
+
+    Parameters
+    ----------
+    input_df : datetime
+
+    Returns
+    -------
+    int
+
+    """
+    return 1000 * int(calendar.timegm(input_dt.timetuple()))
 

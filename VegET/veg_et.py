@@ -38,12 +38,13 @@ g_season_end = 10
 #   and add check to ensure those bands are in the imageCollection, as well as calculations
 #   if necessary from raw bands
 # Get NDVI collection and clip to ROI
-# TODO: Check to see if this could be codensed into one call
+# TODO: Check to see if this could be condensed into one call
 ndvi_coll = ee.ImageCollection("MODIS/006/MOD09Q1").filterDate(start_date, end_date)\
     .filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
     .map(lambda f: f.clip(polygon))
 ndvi_coll = ndvi_coll.map(utils.addNDVI)
-ndvi_coll = ndvi_coll.select('NDVI')
+# DS: select 'ndvi' may not be necessary. Seems to return a 1 band image
+# ndvi_coll = ndvi_coll.select('NDVI')
 
 # Get daily climate dataset(prexcip, eto, temp)
 # TODO: band is hardcoded to precipitation and daily ref et (et0 -> grass)
@@ -51,33 +52,33 @@ precip_eto_coll = ee.ImageCollection('IDAHO_EPSCOR/GRIDMET').filterDate(start_da
     .select('pr', 'eto').filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
     .map(lambda f: f.clip(polygon))
 
-# Specify canopy intercept image or imageCollection
-canopy_int = ee.Image('users/darin_EE/VegET/Interception')
-
+# TODO: Condense all static asset integration to a function in utils
+# Specify canopy intercept image or imageCollection. NOTE: Assumes single band image
+canopy_int = ee.Image('users/darin_EE/VegET/Interception').clip(polygon).rename('intercept')
 # Get static Soil Water Holding Capacity grid (manually uploaded as GEE asset)
-whc = ee.Image('users/darin_EE/VegET/WaterHoldingCapacity_mm')
-
+whc = ee.Image('users/darin_EE/VegET/WaterHoldingCapacity_mm').clip(polygon).rename('whc')
 # Get static Soil Saturation image
-soil_sat = ee.Image('users/darin_EE/VegET/SoilSaturation_mm')
-
+soil_sat = ee.Image('users/darin_EE/VegET/SoilSaturation_mm').clip(polygon).rename('soil_sat')
 # Get static Field Capacity image
-fcap = ee.Image('users/darin_EE/VegET/FieldCapacity_mm')
+#fcap = ee.Image('users/darin_EE/VegET/FieldCapacity_mm').clip(polygon).rename('fcap')
 
-# Get initial soil water EEEEEEEE image
-init_swe = ee.Image('users/darin_EE/VegET/SWE_initial')
+# Create single static image with static inputs as bands
+staticImage = canopy_int.addBands([whc, soil_sat])  #NOTE: Add in fcap once asset add complete in GEE
 
-# Get initial snowpack image
-init_snow_pack = ee.Image('users/darin_EE/VegET/Snowpack_initial')
+# Add statics to ndvi_coll as bands
+ndvi_coll = ndvi_coll.map(utils.addStaticBands([staticImage]))
 
+# Create daily interpolated ndvi collection
 ndvi_daily = interpolate.daily(precip_eto_coll, ndvi_coll)
 
+# Add date band as 'time'
 ndvi_daily = ee.ImageCollection(ndvi_daily.map(utils.add_date_band))
-pet_daily = ee.ImageCollection(pet_daily.map(utils.add_date_band))
-canInt_daily = ee.ImageCollection(canInt_daily.map(utils.add_date_band))
+#canInt_daily = ee.ImageCollection(canInt_daily.map(utils.add_date_band))
 
 # Merge images to new ImageCollection as bands by date
-merged_coll = utils.merge_colls(ndvi_daily, pet_daily, bands_2_add = 'PotEvap_tavg')
-merged_coll = utils.merge_colls(merged_coll, canInt_daily, bands_2_add = 'Ei')
+# NOTE: eto was removed in interp since it only takes the first band for target coll. Add back here.
+merged_coll = utils.merge_colls(ndvi_daily, precip_eto_coll, bands_2_add = 'eto')
+#merged_coll = utils.merge_colls(merged_coll, canInt_daily, bands_2_add = 'Ei')
 
 # TODO: add in snowmelt
 

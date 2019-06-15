@@ -28,13 +28,6 @@ def daily(target_coll, source_coll, interp_days=16, interp_method='linear'):
     :return: ImageCollection of daily interpolated images
     """
 
-    # DS: moved to utils.py
-    # Create a 'time' band in the source_coll data set if one does not exist
-    #def add_date_band(image):
-    #    date_value = date_0utc(ee.Date(image.get('system:time_start')))
-    #    return image.addBands([
-    #        image.select([0]).double().multiply(0).add(date_value.millis()).rename(['time'])])
-
     source_coll = ee.ImageCollection(source_coll.map(add_date_band))
 
     if interp_method.lower() == 'linear':
@@ -50,6 +43,9 @@ def daily(target_coll, source_coll, interp_days=16, interp_method='linear'):
             NOTES: the source_coll images must have a time band. This function is intended to be mapped over
             an image collection and can take only one input parameter (i.e., an image from the target_coll)
             """
+
+            # DS: try to keep all bands from tartet_image
+
             target_image = ee.Image(image).select(0).double()
             target_date = ee.Date(image.get('system:time_start'))
 
