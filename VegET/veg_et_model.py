@@ -7,15 +7,14 @@ import ee
 
 ee.Initialize()
 
-# Using imageCollection.iterate() to make a collection of Soil Water Flux images.
 
-# TODO: Correct the docstring
-def init_image_calc(ref_img, zeros=True):
+def init_image_create(ref_img, zeros=True):
     """
-    Create ee.Image used as initial inputs to VegET when they are not represented by existing images
+    Create ee.Image for initial parameter values. Currently used for SWI, snowpack and SWE
+    images
 
     :param ref_img: ee.Image
-        Reference image used for calculations and/or setting resolution and timestamps
+        Reference image used for calculations and/or setting spatial resolution and metadata
     :param zeros: boolean
         If True, returns ee.Image with all values set to 0. Else, values calculated from ref_img
     :return: ee.Image
@@ -29,6 +28,38 @@ def init_image_calc(ref_img, zeros=True):
 
     init_image = init_image.set('system:time_start', ref_img.get('system:time_start'))
     return ee.Image(init_image)
+
+
+def eff_intercept_precip(image):
+    """
+    Calculate effective precipitation and interception
+    :param image: ee.Image
+        Image with precipitation and canopy interception bands
+
+    :return: ee.Image
+        Image with bands for effective precip and intercepted precip
+    """
+
+    effppt = image.expression(
+        'PRECIP * (1 - (INTERCEPT/100))', {
+            'PRECIP': image.select('pr'),
+            'INTERCEPT': image.select('intercept')
+        }
+    )
+    intppt = image.expression(
+        'PRECIP * (INTERCEPT/100)', {
+            'PRECIP': image.select('pr'),
+            'INTERCEPT': image.select('intercept')
+        }
+    )
+
+    effppt = effppt.set('system:time_start', image.get('system:time_start'))
+    intppt = intppt.set('system:time_start', image.get('system:time_start'))
+
+    eff_int_img = effppt.addBands(intppt).rename(['pr', 'intercept'])
+
+    return ee.Image(eff_int_img)
+
 
 def vegET_model(daily_imageColl, whc_grid_img, start_date):
     """
@@ -47,69 +78,19 @@ def vegET_model(daily_imageColl, whc_grid_img, start_date):
     VARA = ee.Number(1.25)
     VARB = ee.Number(0.2)
 
-    # DS: moved to swi initial calculations. If that works, delete these
-    # Get the date for daily_image
-    #time0 = daily_image.first().get('system:time_start')
-    # Create empty list for swi images to store results of iterate()
-    #first_day = ee.List([
-    #    ee.Image(0).set('system:time_start', time0).select([0], ['SWI'])
-    #])
+    # Calculate initial values where necessary
+    swi_init = init_image_create(whc_grid_img, zeros=False)
+    swe_init = init_image_create(whc_grid_img, zeros=True)
+    snowpack_init = init_image_create(whc_grid_img, zeros=True)
+
+    # Combine to single multiband image
+    init_vals = ee.Image(swi_init.addBands(swe_init, snowpack_init).rename(['swi', 'swe', 'snowpack']))
 
 
-    def effec_precip(image):
-        """
-        Calculate effective precipitation
-        :param image: ee.Image
-            Image with precip and intercept bands
-
-        :return: ee.Image
-            Effective precipitation accounting for canopy intercept
-        """
-
-        effppt = image.expression(
-            'PRECIP * (1 - (INTERCEPT/100))', {
-                'PRECIP': image.select('pr'),
-                'INTERCEPT': image.select('Ei')
-            }
-        )
-        effppt = effppt.set('system:time_start', image.get('system:time_start'))
-
-        return ee.Image(effppt)
-
-    #    DS: This doesn't appear to be used in the demo model
-    #    def intercepted_precip(image):
-    #        """
-    #        Calculate intercepted precipitation
-    #
-    #        :param image: ee.Image
-    #            Image with precipitation and canopy interception bands
-    #        :return: ee.Image
-    #            Intercepted precipitation
-    #        """
-    #
-    #        intppt = image.expression(
-    #            'PRECIP * (INTERCEPT/100)', {
-    #                'PRECIP': image.select('pr'),
-    #                'INTERCEPT': image.select('Ei')
-    #            }
-    #        )
-    #
-    #        return ee.Image(intppt)
-
-
-
-    swi_init = init_image_calc(whc_grid_img, zeros = False)
-    swe_init = init_image_calc(whc_grid_img, zeros = True)
-    snowpack_init = init_image_calc(whc_grid_img, zeros = True)
-# TODO: list needs to be structured such that iterate() can take only one list. Try creating ImageCollection instead
-    #  of images
-
-
-    # Create SWI list for imageCollection.iterate()
-    swi_list = ee.List([
-        ee.Image(swi_init).set('system:time_start', swi_init.get('system:time_start')).select([0], ['SWI'])
+    # Create list for dynamic variables to be used in .iterate()
+    inits_list = ee.List([
+        ee.Image(init_vals).set('system:time_start', init_vals.get('system:time_start')).select([0], ['SWI'])
     ])
-
 
     def daily_swi_calc(daily_image, swi_list):
         """
@@ -166,7 +147,3 @@ def vegET_model(daily_imageColl, whc_grid_img, start_date):
         swf = whc_diff.where(swi_current.gt(whc_grid_img), ee.Image(0.0).where(swf1.gt(0.0), swf1))
 
         return ee.List(swi_list).add(swf)
-
-
-
-
