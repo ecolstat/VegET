@@ -9,7 +9,26 @@ ee.Initialize()
 
 # Using imageCollection.iterate() to make a collection of Soil Water Flux images.
 
+# TODO: Correct the docstring
+def init_image_calc(ref_img, zeros=True):
+    """
+    Create ee.Image used as initial inputs to VegET when they are not represented by existing images
 
+    :param ref_img: ee.Image
+        Reference image used for calculations and/or setting resolution and timestamps
+    :param zeros: boolean
+        If True, returns ee.Image with all values set to 0. Else, values calculated from ref_img
+    :return: ee.Image
+        Image with initial values used in initial step of VegET
+    """
+
+    if zeros:
+        init_image = ref_img.constant(0)
+    else:
+        init_image = ref_img.multiply(0.5)  # Specific for initializing SWi
+
+    init_image = init_image.set('system:time_start', ref_img.get('system:time_start'))
+    return ee.Image(init_image)
 
 def vegET_model(daily_imageColl, whc_grid_img, start_date):
     """
@@ -77,28 +96,7 @@ def vegET_model(daily_imageColl, whc_grid_img, start_date):
     #
     #        return ee.Image(intppt)
 
-# TODO: Correct the docstring
-    def init_image_calc(whc_img, zeros = True):
-        """
-        Calculate soil water index initial value. Effective precip is added in daily_swi_calc().
 
-        :param effect_ppt_init: ee.Image
-            Initial effective precipitation as calculated in effec_precip()
-        :param whc_img: ee.Image
-            Static image of water holding capacity
-        :param zeros: ee.boo
-
-        :return: ee.Image
-            Soil water index for the first day
-        """
-
-        if zeros:
-            init_image = daily_imageColl.first().constant(0)
-        else:
-            init_image = whc_img.multiply(0.5)
-
-        init_image = init_image.set('system:time_start', daily_imageColl.first().get('system:time_start'))
-        return ee.Image(init_image)
 
     swi_init = init_image_calc(whc_grid_img, zeros = False)
     swe_init = init_image_calc(whc_grid_img, zeros = True)
