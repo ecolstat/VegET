@@ -30,7 +30,7 @@ def init_image_create(ref_img, zeros=True):
     return ee.Image(init_image)
 
 
-def eff_intercept_precip(precip_image, intercept_image):
+def eff_intercept_precip(image):
     """
     Calculate effective precipitation and interception
     :param image: ee.Image
@@ -39,14 +39,14 @@ def eff_intercept_precip(precip_image, intercept_image):
     :return: ee.Image
         Image with bands for effective precip and intercepted precip
     """
-
-    effppt = precip_image.expression(
+    # TODO: This is hardcoded for the GRIDMET precip band name 'pr'. Generalize if needed
+    effppt = image.expression(
         'PRECIP * (1 - (INTERCEPT/100))', {
-            'PRECIP': precip_image.select('pr'),
-            'INTERCEPT': intercept_image.select('intercept')
+            'PRECIP': image.select('pr'),
+            'INTERCEPT': image.select('intercept')
         }
     )
-    intppt = precip_image.expression(
+    intppt = image.expression(
         'PRECIP * (INTERCEPT/100)', {
             'PRECIP': image.select('pr'),
             'INTERCEPT': image.select('intercept')

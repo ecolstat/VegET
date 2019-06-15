@@ -42,7 +42,7 @@ g_season_end = 10
 ndvi_coll = ee.ImageCollection("MODIS/006/MOD09Q1").filterDate(start_date, end_date)\
     .filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
     .map(lambda f: f.clip(polygon))
-ndvi_coll = ndvi_coll.map(utils.addNDVI)
+ndvi_coll = ndvi_coll.map(utils.getNDVI)
 # DS: select 'ndvi' may not be necessary. Seems to return a 1 band image
 # ndvi_coll = ndvi_coll.select('NDVI')
 
@@ -54,13 +54,13 @@ precip_eto_coll = ee.ImageCollection('IDAHO_EPSCOR/GRIDMET').filterDate(start_da
 
 # TODO: Condense all static asset integration to a function in utils
 # Specify canopy intercept image or imageCollection. NOTE: Assumes single band image
-canopy_int = ee.Image('users/darin_EE/VegET/Interception').clip(polygon).rename('intercept')
+canopy_int = ee.Image('users/darin_EE/VegET/Interception').clip(polygon).double().rename('intercept')
 # Get static Soil Water Holding Capacity grid (manually uploaded as GEE asset)
-whc = ee.Image('users/darin_EE/VegET/WaterHoldingCapacity_mm').clip(polygon).rename('whc')
+whc = ee.Image('users/darin_EE/VegET/WaterHoldingCapacity_mm').clip(polygon).double().rename('whc')
 # Get static Soil Saturation image
-soil_sat = ee.Image('users/darin_EE/VegET/SoilSaturation_mm').clip(polygon).rename('soil_sat')
+soil_sat = ee.Image('users/darin_EE/VegET/SoilSaturation_mm').clip(polygon).double().rename('soil_sat')
 # Get static Field Capacity image
-#fcap = ee.Image('users/darin_EE/VegET/FieldCapacity_mm').clip(polygon).rename('fcap')
+#fcap = ee.Image('users/darin_EE/VegET/FieldCapacity_mm').clip(polygon).double().rename('fcap')
 
 # Create single static image with static inputs as bands
 staticImage = canopy_int.addBands([whc, soil_sat])  #NOTE: Add in fcap once asset add complete in GEE

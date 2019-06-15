@@ -25,7 +25,7 @@ def add_date_band(image):
         image.select([0]).double().multiply(0).add(date_value.millis()).rename(['time'])])
 
 
-def addNDVI(image):
+def getNDVI(image):
     """
     Function for calculating NDVI (used here for 8-day NDVI from preprocessed MODIS Terra 8-day SR)
     :param image: ee.Image
@@ -35,8 +35,12 @@ def addNDVI(image):
     """
     # TODO: include checks for identifying sensor and appropriate bands. Now just hardcoded for MODIS
     # For MODIS
-    ndvi_calc = image.normalizedDifference(['sur_refl_b01', 'sur_refl_b02']).rename('NDVI')
-    return image.addBands(ndvi_calc)
+    ndvi_calc = image.normalizedDifference(['sur_refl_b01', 'sur_refl_b02']).double().rename('NDVI')
+    return ndvi_calc\
+        .set({
+            'system:index': image.get('system:index'),
+            'system:time_start': image.get('system:time_start')
+    })
 
 
 def addStaticBands(staticsImg):

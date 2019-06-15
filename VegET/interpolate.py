@@ -44,8 +44,7 @@ def daily(target_coll, source_coll, interp_days=16, interp_method='linear'):
             an image collection and can take only one input parameter (i.e., an image from the target_coll)
             """
 
-            # DS: try to keep all bands from tartet_image
-
+            # TODO: try to keep all bands from tartet_image if useful to do so
             target_image = ee.Image(image).select(0).double()
             target_date = ee.Date(image.get('system:time_start'))
 
