@@ -84,9 +84,7 @@ def vegET_model(daily_imageColl, whc_grid_img, start_date):
     initial_images = init_image_create(daily_imageColl, whc_grid_img)
 
     # Create list for dynamic variables to be used in .iterate()
-    inits_list = ee.List([
-        ee.Image(init_vals).set('system:time_start', init_vals.get('system:time_start')).select([0], ['SWI'])
-    ])
+    inits_list = ee.List([initial_images])
 
     def daily_swi_calc(daily_image, swi_list):
         """

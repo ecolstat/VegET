@@ -45,7 +45,7 @@ def daily(target_coll, source_coll, interp_days=16, interp_method='linear'):
             """
 
             # TODO: try to keep all bands from tartet_image if useful to do so
-            target_image = ee.Image(image).select(0).double()
+            target_image = ee.Image(image).double()
             target_date = ee.Date(image.get('system:time_start'))
 
             # All filtering will be done based on 0 UTC dates

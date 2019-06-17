@@ -60,10 +60,10 @@ whc = ee.Image('users/darin_EE/VegET/WaterHoldingCapacity_mm').clip(polygon).dou
 # Get static Soil Saturation image
 soil_sat = ee.Image('users/darin_EE/VegET/SoilSaturation_mm').clip(polygon).double().rename('soil_sat')
 # Get static Field Capacity image
-#fcap = ee.Image('users/darin_EE/VegET/FieldCapacity_mm').clip(polygon).double().rename('fcap')
+fcap = ee.Image('users/darin_EE/VegET/FieldCapacity_mm').clip(polygon).double().rename('fcap')
 
 # Create single static image with static inputs as bands
-staticImage = canopy_int.addBands([whc, soil_sat])  #NOTE: Add in fcap once asset add complete in GEE
+staticImage = canopy_int.addBands([whc, soil_sat, fcap])
 
 # Add statics to ndvi_coll as bands
 ndvi_coll = ndvi_coll.map(utils.addStaticBands([staticImage]))
@@ -77,7 +77,8 @@ ndvi_daily = ee.ImageCollection(ndvi_daily.map(utils.add_date_band))
 
 # Merge images to new ImageCollection as bands by date
 # NOTE: eto was removed in interp since it only takes the first band for target coll. Add back here.
-merged_coll = utils.merge_colls(ndvi_daily, precip_eto_coll, bands_2_add = 'eto')
+
+#merged_coll = utils.merge_colls(ndvi_daily, precip_eto_coll, bands_2_add = 'eto')
 #merged_coll = utils.merge_colls(merged_coll, canInt_daily, bands_2_add = 'Ei')
 
 # TODO: add in snowmelt
