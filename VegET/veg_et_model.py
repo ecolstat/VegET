@@ -4,30 +4,32 @@ run iteratively over an Earth Engine imageCollection.
 """
 
 import ee
-
+from VegET import utils
 ee.Initialize()
 
 
-def init_image_create(ref_img, zeros=True):
+def init_image_create(ref_imgColl, whc_img):
     """
-    Create ee.Image for initial parameter values. Currently used for SWI, snowpack and SWE
-    images
-
-    :param ref_img: ee.Image
-        Reference image used for calculations and/or setting spatial resolution and metadata
-    :param zeros: boolean
-        If True, returns ee.Image with all values set to 0. Else, values calculated from ref_img
+    Create necessary images with predifined initial values. Serve as input to first step in VegET run.
+    :param ref_imgColl: ee.ImageCollection
+        Reference imageCollection for spatial scale and time-stamp. Initially using GRIDMET image.
+    :param whc_img: ee.Image
+        Water holding capacity static image for creating SWI
     :return: ee.Image
-        Image with initial values used in initial step of VegET
+        Image with bands for swi, swe and snowpack initial values.
     """
 
-    if zeros:
-        init_image = ref_img.constant(0)
-    else:
-        init_image = ref_img.multiply(0.5)  # Specific for initializing SWi
+    swe = ee.Image(utils.const_imageColl(ref_imgColl, 0))
+    snowpack = ee.Image(utils.const_imageColl(ref_imgColl, 0))
+    swi = ee.Image(utils.const_image(whc_img, 0.5))
 
-    init_image = init_image.set('system:time_start', ref_img.get('system:time_start'))
-    return ee.Image(init_image)
+    dynamic_imgs = swi.addBands([swe, snowpack]).rename(['swi', 'swe', 'snowpack'])\
+        .set({
+        'system:index': ref_imgColl.get('system:index'),
+        'system:time_start': ref_imgColl.get('system:time_start')
+    })
+
+    return ee.Image(dynamic_imgs)
 
 
 def eff_intercept_precip(image):
@@ -56,7 +58,7 @@ def eff_intercept_precip(image):
     effppt = effppt.set('system:time_start', image.get('system:time_start'))
     intppt = intppt.set('system:time_start', image.get('system:time_start'))
 
-    eff_int_img = effppt.addBands(intppt).rename(['pr', 'intercept'])
+    eff_int_img = effppt.addBands(intppt).double().rename(['pr', 'intercept'])
 
     return ee.Image(eff_int_img)
 
@@ -79,13 +81,7 @@ def vegET_model(daily_imageColl, whc_grid_img, start_date):
     VARB = ee.Number(0.2)
 
     # Calculate initial values where necessary
-    swi_init = init_image_create(whc_grid_img, zeros=False)
-    swe_init = init_image_create(whc_grid_img, zeros=True)
-    snowpack_init = init_image_create(whc_grid_img, zeros=True)
-
-    # Combine to single multiband image
-    init_vals = ee.Image(swi_init.addBands(swe_init, snowpack_init).rename(['swi', 'swe', 'snowpack']))
-
+    initial_images = init_image_create(daily_imageColl, whc_grid_img)
 
     # Create list for dynamic variables to be used in .iterate()
     inits_list = ee.List([
@@ -133,6 +129,7 @@ def vegET_model(daily_imageColl, whc_grid_img, start_date):
             'PotEvap_tavg'))
         etasw1B = ee.Image(daily_image.select('NDVI').multiply(VARA).multiply(daily_image.select('PotEvap_tavg')))
 
+        # TODO: consider ee.Algorithms.If() for conditional statements
         # DS This may fail since it's calling on values in multiple images
         etasw1 = etasw1A.where(daily_image.select('NDVI').gt(0.4), etasw1B)
 

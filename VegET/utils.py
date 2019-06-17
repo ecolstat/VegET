@@ -65,6 +65,36 @@ def addStaticBands(staticsImg):
     return wrap
 
 
+def const_image(img, value):
+    """
+    Create an image with constant values at spatial scale of img
+    :param img: ee.Image
+        reference image for spatial scale and possibly time-stamp
+    :param value: ee.Number
+        Constant value to populate the image pixels
+    :return: ee.Image
+        image with all pixel values set to value parameter
+    """
+    # TODO: change to check for collection vs image type to determine if .first() should be used.
+    const_img = ee.Image(img.select(0).multiply(value).double());
+    return const_img
+
+# TODO: This should be combined with const_image() function.
+def const_imageColl(imgColl, value):
+    """
+    Create an image with constant values at spatial scale of imgColl
+    :param imgColl: ee.Image
+        reference image for spatial scale and possibly time-stamp
+    :param value: ee.Number
+        Constant value to populate the image pixels
+    :return: ee.Image
+        image with all pixel values set to value parameter
+    """
+    # TODO: change to check for collection vs image type to determine if .first() should be used.
+    const_img = ee.Image(imgColl.first().select(0).multiply(value).double());
+    return const_img
+
+
 def date_0utc(date):
     """NOTE: Copied from openet.core.utils.py from 06.04.19 pull
     Get the 0 UTC date for a date
