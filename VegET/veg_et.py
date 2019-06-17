@@ -49,8 +49,12 @@ ndvi_coll = ndvi_coll.map(utils.getNDVI)
 # Get daily climate dataset(prexcip, eto, temp)
 # TODO: band is hardcoded to precipitation and daily ref et (et0 -> grass)
 precip_eto_coll = ee.ImageCollection('IDAHO_EPSCOR/GRIDMET').filterDate(start_date, end_date)\
-    .select('pr', 'eto').filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
+    .select('pr', 'eto', 'tmmn', 'tmmx').filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
     .map(lambda f: f.clip(polygon))
+
+# Add band for calculated mean daily temp
+precip_eto_coll = precip_eto_coll.map(utils.dailyMeanTemp)
+
 
 # TODO: Condense all static asset integration to a function in utils
 # Specify canopy intercept image or imageCollection. NOTE: Assumes single band image
