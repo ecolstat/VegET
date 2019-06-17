@@ -165,6 +165,23 @@ def getNDVI(image):
 #     return merged_coll
 
 
+def kelvin2celsius(img):
+    """
+    Kelvin to celsius conversion for gridmet data temperature bands
+    NOTE: Assumes daily mean temp has been calculated (see utils.dailyMeanTemp())
+    :param image: ee.Image
+        Gridmet image with tmmn, tmmx and (calculated) tmean bands
+    :return: ee.Image
+        Image with temperature values converted from kelvin to celsius
+    """
+
+    tempsC = ee.Image(img.select(['tmmn', 'tmmx', 'tmean']).subtract(ee.Number(273.15))).rename(['tminC', 'tmaxC',
+                                                                                              'tmeanC'])
+
+    newImage = img.addBands(tempsC)
+    return newImage
+
+
 def millis(input_dt):
     """NOTE: Copied from openet.core.utils.py from 06.04.19 pull
     Convert datetime to milliseconds since epoch

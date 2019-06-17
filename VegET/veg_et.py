@@ -54,7 +54,8 @@ precip_eto_coll = ee.ImageCollection('IDAHO_EPSCOR/GRIDMET').filterDate(start_da
 
 # Add band for calculated mean daily temp
 precip_eto_coll = precip_eto_coll.map(utils.dailyMeanTemp)
-
+# Convert to Celsius
+precip_eto_coll = precip_eto_coll.map(utils.kelvin2celsius).select(['pr', 'eto', 'tminC', 'tmaxC', 'tmeanC'])
 
 # TODO: Condense all static asset integration to a function in utils
 # Specify canopy intercept image or imageCollection. NOTE: Assumes single band image

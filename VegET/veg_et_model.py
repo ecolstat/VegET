@@ -86,7 +86,7 @@ def vegET_model(daily_imageColl, whc_grid_img, start_date):
     # Create list for dynamic variables to be used in .iterate()
     inits_list = ee.List([initial_images])
 
-    def daily_swi_calc(daily_image, swi_list):
+    def daily_swi_calc(daily_img, init_imgs):
         """
         Function to run imageCollection.iterate(). Takes latest value from swi_list as previous
             time-step SWI, current day whc_image and daily_image
@@ -95,11 +95,11 @@ def vegET_model(daily_imageColl, whc_grid_img, start_date):
         :param daily_image:
         :return:
         """
-        prev_swi = ee.Image(ee.List(swi_list).get(-1))
+        prev_swi = ee.Image(ee.List(init_imgs).get(-1))
 
-        effective_precip = effec_precip(daily_image)
+        effective_precip = eff_intercept_precip(daily_img)
 
-        swi_current = ee.Image(prev_swi.add(effective_precip))
+        swi_current = ee.Image(prev_swi.select('swi').add(effective_precip))
 
         def rfi_calc(image1, image2):
             """
