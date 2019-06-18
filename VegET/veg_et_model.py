@@ -7,8 +7,8 @@ import ee
 from VegET import utils
 ee.Initialize()
 
-
-def init_image_create(ref_imgColl, whc_img):
+# TODO: update docstring
+def init_image_create(ref_imgColl, whc_img, effppt):
     """
     Create necessary images with predifined initial values. Serve as input to first step in VegET run.
     :param ref_imgColl: ee.ImageCollection
@@ -21,7 +21,9 @@ def init_image_create(ref_imgColl, whc_img):
 
     swe = ee.Image(utils.const_imageColl(ref_imgColl, 0))
     snowpack = ee.Image(utils.const_imageColl(ref_imgColl, 0))
-    swi = ee.Image(utils.const_image(whc_img, 0.5))
+
+    # TODO: Adding swe is unnecessary since it is 0 valued for the initial state
+    swi = ee.Image(utils.const_image(whc_img, 0.5)).multiply(effppt).add(swe)
 
     dynamic_imgs = swi.addBands([swe, snowpack]).rename(['swi', 'swe', 'snowpack'])\
         .set({
@@ -58,9 +60,10 @@ def eff_intercept_precip(image):
     effppt = effppt.set('system:time_start', image.get('system:time_start'))
     intppt = intppt.set('system:time_start', image.get('system:time_start'))
 
-    eff_int_img = effppt.addBands(intppt).double().rename(['pr', 'intercept'])
+    eff_int_img = effppt.addBands(intppt).double().rename(['effppt', 'intercept'])
 
     return ee.Image(eff_int_img)
+
 
 # TODO: this hardcodes the tmeanC band name and threshold values. Possible user input?
 def rain_frac_calc(image, geometry):
@@ -83,7 +86,7 @@ def rain_frac_calc(image, geometry):
 
 
 
-
+# TODO: update the docstring.
 def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
     """
     Calculate Daily Soil Water Index (SWI)
@@ -102,14 +105,17 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
     VARB = ee.Number(0.2)
 
     # Calculate initial values where necessary
-    initial_images = init_image_create(daily_imageColl, whc_grid_img)
+    init_effppt = eff_intercept_precip(daily_imageColl.first())
+    initial_images = init_image_create(daily_imageColl, whc_grid_img, init_effppt.select('effppt'))
 
     # Create list for dynamic variables to be used in .iterate()
-    inits_list = ee.List([initial_images])
+    outputs_list = ee.List([initial_images])
 
+    # Create constant image for calculations in daily_vegET_calc()
+    const_img = ee.Image(1.0)
 
-
-    def daily_vegET_calc(daily_img, init_imgs):
+# TODO: Update docstring
+    def daily_vegET_calc(daily_img, outputs_list):
         """
         Function to run imageCollection.iterate(). Takes latest value from swi_list as previous
             time-step SWI, current day whc_image and daily_image
@@ -118,12 +124,59 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
         :param daily_image:
         :return:
         """
-        prev_swi = ee.Image(ee.List(init_imgs).get(-1))
+
+        # Outputs from previous day as inputs to current day.
+        # NOTE: needs to be cast to list then image. see: https://developers.google.com/earth-engine/ic_iterating
+        prev_outputs = ee.Image(ee.List(outputs_list.get(-1)))
 
         # Calculate rain_frac
         rain_frac = rain_frac_calc(daily_img, bbox)
 
+        # Calculate effective precipitation and intercepted precip
         effective_precip = eff_intercept_precip(daily_img)
+
+        # Calculate amount of effective precipitation as rain
+        rain = rain_frac.multiply(effective_precip.select('effppt'))
+
+        # TODO: Double check this is ok. Essentially skips first run as is in the esri version
+
+        swe = ee.Image(const_img.subtract(rain_frac)).multiply(effective_precip.select('effppt'))
+
+        def melt_rate_calc(image):
+            """
+            Calculate melt_rate
+            :param image: ee.Image
+                Image with max and min temp bands
+            :return: ee.Image
+
+            """
+            melt_rate = image.expression(
+                 '0.06 * ((tmax * tmax) - (tmax * tmin))', {
+                    'tmax': image.select('tmmxC'),
+                    'tmin': image.select('tmmnC')
+                }
+            )
+            melt_rate = melt_rate.set('system:time_start', image.get('system:time_start'))
+            return melt_rate
+
+        melt_rate = melt_rate_calc(daily_img)
+
+# TODO: Update docstring
+        def snow_melt_calc(melt_rate_img, swe_img):
+            """
+            Calculate snow melt from melt rate and soil water equivalent
+            :param melt_rate_img:
+            :param swe_img:
+            :return:
+            """
+
+            # Combine images to allow for band selection in expression
+            snow_melt_img = melt_rate_img.addBands(swe_img).rename(['melt_rate', 'swe'])
+            snow_melt = snow_melt_img.expression(
+
+            )
+
+
 
         swi_current = ee.Image(prev_swi.select('swi').add(effective_precip))
 
