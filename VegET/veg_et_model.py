@@ -62,8 +62,29 @@ def eff_intercept_precip(image):
 
     return ee.Image(eff_int_img)
 
+# TODO: this hardcodes the tmeanC band name and threshold values. Possible user input?
+def rain_frac_calc(image, geometry):
+    """
+    Calculate rain fraction (used to scale effective precip as snow water equivalent or rain depending on temperature.
+    :param geometry: ee.Feature, ee.FeatureCollection, ee.Geometry
+        Bounding region. Expressions do not respect image bounds, so it needs to be clipped.
+    :param image: ee.Image
+        Image with mean temperature band
+    :return: ee.Image
+        Image representing proportion of effective precip that should be considered rain
+    """
 
-def vegET_model(daily_imageColl, whc_grid_img, start_date):
+    rain_frac = image.expression(
+        "(b('tmeanC') <= 6.0) ? 0" +
+        ": (b('tmeanC') > 6.0) && (b('tmeanC') < 12.0) ? (b('tmeanC') * 0.0833)" +
+        ": 1").clip(geometry)
+
+    return ee.Image(rain_frac).double()
+
+
+
+
+def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
     """
     Calculate Daily Soil Water Index (SWI)
     :param start_date: ee.Date
@@ -86,7 +107,9 @@ def vegET_model(daily_imageColl, whc_grid_img, start_date):
     # Create list for dynamic variables to be used in .iterate()
     inits_list = ee.List([initial_images])
 
-    def daily_swi_calc(daily_img, init_imgs):
+
+
+    def daily_vegET_calc(daily_img, init_imgs):
         """
         Function to run imageCollection.iterate(). Takes latest value from swi_list as previous
             time-step SWI, current day whc_image and daily_image
@@ -97,9 +120,13 @@ def vegET_model(daily_imageColl, whc_grid_img, start_date):
         """
         prev_swi = ee.Image(ee.List(init_imgs).get(-1))
 
+        # Calculate rain_frac
+        rain_frac = rain_frac_calc(daily_img, bbox)
+
         effective_precip = eff_intercept_precip(daily_img)
 
         swi_current = ee.Image(prev_swi.select('swi').add(effective_precip))
+
 
         def rfi_calc(image1, image2):
             """
