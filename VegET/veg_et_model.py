@@ -104,6 +104,12 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
     VARA = ee.Number(1.25)
     VARB = ee.Number(0.2)
 
+    # Drainage Coefficient (ee.Image to add as band for .expression())
+    dc_coeff = ee.Image(0.65)
+
+    # rf coefficient (ee.Image to add as band for .expression())
+    rf_coeff = ee.Image(1 - dc_coeff)
+
     # Calculate initial values where necessary
     init_effppt = eff_intercept_precip(daily_imageColl.first())
     initial_images = init_image_create(daily_imageColl, whc_grid_img, init_effppt.select('effppt'))
@@ -179,8 +185,8 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
                                                                                                      'swe', 'snowpack'])
 
             snow_melt = snow_melt_img.expression(
-                "(b('melt_rate') <= (b('swe') + (b('snowpack'))) ? (b('melt_rate'))" +
-                ": (b('swe') + (b('snowpack')))").clip(geometry).rename(['snowmelt'])
+                "(b('melt_rate') <= (b('swe') + b('snowpack'))) ? (b('melt_rate'))" +
+                ": (b('swe') + b('snowpack'))").clip(geometry).rename(['snowmelt'])
             return snow_melt
 
         snow_melt = snow_melt_calc(melt_rate, swe, prev_outputs.select('snowpack'), bbox)
@@ -203,8 +209,38 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
 
         snowpack = snowpack_calc(prev_outputs.select('snowpack'), swe, snow_melt)
 
-        swi_current = ee.Image(prev_swi.select('swi').add(effective_precip))
+        swi_current = ee.Image(prev_outputs.select('swi').add(rain).add(snow_melt))
 
+        sat_fc = daily_img.select('soil_sat').subtract(daily_img.select('fcap'))
+
+        rf1 = swi_current.subtract(whc_grid_img)
+
+        rf = rf1.where(rf1.lt(0.0), 0.0)
+
+        def srf_calc(rf_img, sat_fc_img, rf_coeff, geometry):
+            """
+            Calculate srf
+            :param rf_img: ee.Image 
+                image for rf
+            :param sat_fc_img: ee.Image
+                sat_fc_image
+            :param rf_coeff: ee.Image
+                rf coefficient
+            :return: ee.Image
+            """
+
+            # add bands to make single image for .expression
+            srf_input_img = rf_img.addBands([sat_fc_img, rf_coeff]).rename(['rf', 'sat_fc', 'rf_coeff'])
+
+            srf = srf_input_img.expression(
+                "(b('rf') <= b('sat_fc')) ? (b('rf') * b('rf_coeff'))" +
+                ": (b('rf') - b('sat_fc')) + b('rf_coeff') * b('sat_fc')").clip(geometry)
+            return srf
+
+        srf = srf_calc(rf, sat_fc, rf_coeff, bbox)
+
+        # Deep drainage
+        ddrain = rf.subtract(srf).double()
 
         def rfi_calc(image1, image2):
             """
