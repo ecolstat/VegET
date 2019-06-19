@@ -180,10 +180,28 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
 
             snow_melt = snow_melt_img.expression(
                 "(b('melt_rate') <= (b('swe') + (b('snowpack'))) ? (b('melt_rate'))" +
-                ": (b('swe') + (b('snowpack')))").clip(geometry)
+                ": (b('swe') + (b('snowpack')))").clip(geometry).rename(['snowmelt'])
             return snow_melt
 
         snow_melt = snow_melt_calc(melt_rate, swe, prev_outputs.select('snowpack'), bbox)
+
+        def snowpack_calc(prev_sw_image, swe_current, snow_melt):
+            """
+            Calculate snowpack
+            :param prev_sw_image: ee.Image
+                image with band for snowpack at previous timestep
+            :param swe_current: ee.Image
+                current swe
+            :param snow_melt: ee.Image
+                current snowmelt
+            :return: ee.Image
+            """
+
+            snwpk1 = prev_sw_image.add(swe_current).subtract(snow_melt)
+            snowpack = snwpk1.where(snwpk1.lt(0.0), 0.0)
+            return snowpack
+
+        snowpack = snowpack_calc(prev_outputs.select('snowpack'), swe, snow_melt)
 
         swi_current = ee.Image(prev_swi.select('swi').add(effective_precip))
 
