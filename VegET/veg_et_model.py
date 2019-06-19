@@ -139,7 +139,7 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
         rain = rain_frac.multiply(effective_precip.select('effppt'))
 
         # TODO: Double check this is ok. Essentially skips first run as is in the esri version
-
+        # TODO: This will be combined with snowpack and swf at end of run to make new outputs_list append
         swe = ee.Image(const_img.subtract(rain_frac)).multiply(effective_precip.select('effppt'))
 
         def melt_rate_calc(image):
@@ -152,8 +152,8 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
             """
             melt_rate = image.expression(
                  '0.06 * ((tmax * tmax) - (tmax * tmin))', {
-                    'tmax': image.select('tmmxC'),
-                    'tmin': image.select('tmmnC')
+                    'tmax': image.select('tmaxC'),
+                    'tmin': image.select('tminC')
                 }
             )
             melt_rate = melt_rate.set('system:time_start', image.get('system:time_start'))
@@ -162,21 +162,28 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
         melt_rate = melt_rate_calc(daily_img)
 
 # TODO: Update docstring
-        def snow_melt_calc(melt_rate_img, swe_img):
+        def snow_melt_calc(melt_rate_img, swe_current, prev_sw_image, geometry):
             """
-            Calculate snow melt from melt rate and soil water equivalent
-            :param melt_rate_img:
-            :param swe_img:
-            :return:
+            Calculate snow melt
+            :param melt_rate_img: ee.Image
+                Melt rate image
+            :param swe_current: ee.Image
+                Current time-step calculation of swe
+            :param prev_sw_image: ee.Image
+                Snowpack band from previous timestep list
+            :return: ee.Image
             """
 
             # Combine images to allow for band selection in expression
-            snow_melt_img = melt_rate_img.addBands(swe_img).rename(['melt_rate', 'swe'])
+            snow_melt_img = melt_rate_img.addBands(swe_current, prev_sw_image.select('snowpack')).rename(['melt_rate',
+                                                                                                     'swe', 'snowpack'])
+
             snow_melt = snow_melt_img.expression(
+                "(b('melt_rate') <= (b('swe') + (b('snowpack'))) ? (b('melt_rate'))" +
+                ": (b('swe') + (b('snowpack')))").clip(geometry)
+            return snow_melt
 
-            )
-
-
+        snow_melt = snow_melt_calc(melt_rate, swe, prev_outputs.select('snowpack'), bbox)
 
         swi_current = ee.Image(prev_swi.select('swi').add(effective_precip))
 
