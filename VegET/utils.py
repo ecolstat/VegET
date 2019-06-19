@@ -116,7 +116,7 @@ def getNDVI(image):
     """
     # TODO: include checks for identifying sensor and appropriate bands. Now just hardcoded for MODIS
     # For MODIS
-    ndvi_calc = image.normalizedDifference(['sur_refl_b01', 'sur_refl_b02']).double().rename('NDVI')
+    ndvi_calc = image.normalizedDifference(['sur_refl_b02', 'sur_refl_b01']).double().rename('NDVI')
     return ndvi_calc\
         .set({
             'system:index': image.get('system:index'),
