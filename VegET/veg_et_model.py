@@ -242,35 +242,37 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
         # Deep drainage
         ddrain = rf.subtract(srf).double()
 
-        def rfi_calc(image1, image2):
-            """
-            Calculate runoff as swi - whc
-            :param image1: ee.Image
-                Soil Water Index image
-            :param image2: ee.Image
-                Water holding capacity image
-            :return: ee.Image
-                Runoff as only positive valued image
-            """
 
-            rf = image1.subtract(image2)
+# TODO: Verify if this is still needed
+        # def rfi_calc(image1, image2):
+        #     """
+        #     Calculate runoff as swi - whc
+        #     :param image1: ee.Image
+        #         Soil Water Index image
+        #     :param image2: ee.Image
+        #         Water holding capacity image
+        #     :return: ee.Image
+        #         Runoff as only positive valued image
+        #     """
+        #
+        #     rf = image1.subtract(image2)
+        #
+        #     # Set value to 0 if rf < 0
+        #     rfi = rf.where(rf.lt(0), 0)
+        #
+        #     rfi = rfi.set('system:time_start', image1.get('system:time_start'))
+        #
+        #     return ee.Image(rfi)
+        #
+        # rfi = rfi_calc(swi_current, whc_grid_img)
 
-            # Set value to 0 if rf < 0
-            rfi = rf.where(rf.lt(0), 0)
-
-            rfi = rfi.set('system:time_start', image1.get('system:time_start'))
-
-            return ee.Image(rfi)
-
-        rfi = rfi_calc(swi_current, whc_grid_img)
-
-        etasw1A = ee.Image(daily_image.select('NDVI').multiply(VARA).add(VARB)).multiply(daily_image.select(
-            'PotEvap_tavg'))
-        etasw1B = ee.Image(daily_image.select('NDVI').multiply(VARA).multiply(daily_image.select('PotEvap_tavg')))
+        etasw1A = ee.Image(daily_img.select('ndvi').multiply(VARA).add(VARB)).multiply(daily_img.select(
+            'eto'))
+        etasw1B = ee.Image(daily_img.select('NDVI').multiply(VARA).multiply(daily_img.select('eto')))
 
         # TODO: consider ee.Algorithms.If() for conditional statements
         # DS This may fail since it's calling on values in multiple images
-        etasw1 = etasw1A.where(daily_image.select('NDVI').gt(0.4), etasw1B)
+        etasw1 = etasw1A.where(daily_img.select('ndvi').gt(0.4), etasw1B)
 
         etasw2 = etasw1.multiply(swi_current.divide(whc_grid_img.multiply(0.5)))
         etasw3 = etasw1.where(swi_current.gt(whc_grid_img.multiply(0.5)), etasw2)
@@ -278,8 +280,10 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
         etasw = whc_grid_img.where(etasw4.gt(whc_grid_img), etasw4)
 
         swf1 = swi_current.subtract(etasw)
-        whc_diff = ee.Image(whc_grid_img.subtract(etasw))
+        bigswi = ee.Image(whc_grid_img.subtract(etasw))
 
-        swf = whc_diff.where(swi_current.gt(whc_grid_img), ee.Image(0.0).where(swf1.gt(0.0), swf1))
+        swf = bigswi.where(swi_current.gt(whc_grid_img), ee.Image(0.0).where(swf1.lt(0.0), swf1))
+
+        # TODO: Combine all dynamic outputs into iteration list
 
         return ee.List(swi_list).add(swf)
