@@ -27,8 +27,8 @@ def init_image_create(ref_imgColl, whc_img, effppt):
 
     dynamic_imgs = swi.addBands([swe, snowpack]).rename(['swi', 'swe', 'snowpack'])\
         .set({
-        'system:index': ref_imgColl.get('system:index'),
-        'system:time_start': ref_imgColl.get('system:time_start')
+        'system:index': ref_imgColl.first().get('system:index'),
+        'system:time_start': ref_imgColl.first().get('system:time_start')
     })
 
     return ee.Image(dynamic_imgs)
