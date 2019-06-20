@@ -3,10 +3,11 @@ Main file for running VegET model.
 
 """
 
-from VegET import interpolate, daily_aggregate, utils
-# import cartoee as cee
+from VegET import interpolate, daily_aggregate, utils, veg_et_model
+import cartoee as cee
 import matplotlib.pyplot as plt
 import ee
+import ee.mapclient
 
 ee.Initialize()
 
@@ -86,7 +87,8 @@ ndvi_daily = ee.ImageCollection(ndvi_daily.map(utils.add_date_band))
 #merged_coll = utils.merge_colls(ndvi_daily, precip_eto_coll, bands_2_add = 'eto')
 #merged_coll = utils.merge_colls(merged_coll, canInt_daily, bands_2_add = 'Ei')
 
-# TODO: add in snowmelt
+# Run VegET model
+vegET_run = veg_et_model.vegET_model(ndvi_daily, polygon)
 
 #if __name__ == '__main__':
 #    pass

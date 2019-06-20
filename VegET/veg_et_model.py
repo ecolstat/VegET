@@ -87,7 +87,7 @@ def rain_frac_calc(image, geometry):
 
 
 # TODO: update the docstring.
-def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
+def vegET_model(daily_imageColl, bbox):
     """
     Calculate Daily Soil Water Index (SWI)
     :param start_date: ee.Date
@@ -104,11 +104,14 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
     VARA = ee.Number(1.25)
     VARB = ee.Number(0.2)
 
+    # Define whc_grid
+    whc_grid_img = ee.Image(daily_imageColl.first().select('whc'))
+
     # Drainage Coefficient (ee.Image to add as band for .expression())
     dc_coeff = ee.Image(0.65)
 
     # rf coefficient (ee.Image to add as band for .expression())
-    rf_coeff = ee.Image(1 - dc_coeff)
+    rf_coeff = ee.Image(1.0).subtract(dc_coeff)
 
     # Calculate initial values where necessary
     init_effppt = eff_intercept_precip(daily_imageColl.first())
@@ -133,7 +136,7 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
 
         # Outputs from previous day as inputs to current day.
         # NOTE: needs to be cast to list then image. see: https://developers.google.com/earth-engine/ic_iterating
-        prev_outputs = ee.Image(ee.List(outputs_list.get(-1)))
+        prev_outputs = ee.Image(ee.List(outputs_list).get(-1))
 
         # Calculate rain_frac
         rain_frac = rain_frac_calc(daily_img, bbox)
@@ -181,7 +184,7 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
             """
 
             # Combine images to allow for band selection in expression
-            snow_melt_img = melt_rate_img.addBands(swe_current, prev_sw_image.select('snowpack')).rename(['melt_rate',
+            snow_melt_img = melt_rate_img.addBands([swe_current, prev_sw_image.select('snowpack')]).rename(['melt_rate',
                                                                                                      'swe', 'snowpack'])
 
             snow_melt = snow_melt_img.expression(
@@ -268,7 +271,7 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
 
         etasw1A = ee.Image(daily_img.select('ndvi').multiply(VARA).add(VARB)).multiply(daily_img.select(
             'eto'))
-        etasw1B = ee.Image(daily_img.select('NDVI').multiply(VARA).multiply(daily_img.select('eto')))
+        etasw1B = ee.Image(daily_img.select('ndvi').multiply(VARA).multiply(daily_img.select('eto')))
 
         # TODO: consider ee.Algorithms.If() for conditional statements
         # DS This may fail since it's calling on values in multiple images
@@ -296,7 +299,7 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
             :return: ee.Image
             """
 
-            output_img = swf_img.addBands([swe_img, snowpack_img]).rename(['swf', 'swe', 'snowpack']) \
+            output_img = swf_img.addBands([swe_img, snowpack_img]).rename(['swi', 'swe', 'snowpack']) \
                 .set({
                 'system:index': ref_img.get('system:index'),
                 'system:time_start': ref_img.get('system:time_start')
