@@ -284,6 +284,30 @@ def vegET_model(daily_imageColl, whc_grid_img, bbox, start_date):
 
         swf = bigswi.where(swi_current.gt(whc_grid_img), ee.Image(0.0).where(swf1.lt(0.0), swf1))
 
-        # TODO: Combine all dynamic outputs into iteration list
+        # TODO: This could be generalized with init_image_create
+        def output_image_create(ref_img, swf_img, swe_img, snowpack_img):
+            """
+            Combine images to create single output image with multiple bands
+            :param daily_img: ee.Image
+                reference image for timestamp
+            :param swf_img: ee.Image
+            :param swe_img: ee.Image
+            :param snowpack_img: ee.Image
+            :return: ee.Image
+            """
 
-        return ee.List(swi_list).add(swf)
+            output_img = swf_img.addBands([swe_img, snowpack_img]).rename(['swf', 'swe', 'snowpack']) \
+                .set({
+                'system:index': ref_img.get('system:index'),
+                'system:time_start': ref_img.get('system:time_start')
+            })
+
+            return ee.Image(output_img)
+
+        # Create output image
+        output_image = output_image_create(daily_img, swf, swe, snowpack)
+
+        return ee.List(outputs_list).add(output_image)
+
+    return ee.ImageCollection(ee.List(daily_imageColl.iterate(daily_vegET_calc, outputs_list)))
+
