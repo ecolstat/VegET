@@ -80,7 +80,7 @@ def rain_frac_calc(image, geometry):
     rain_frac = image.expression(
         "(b('tmeanC') <= 6.0) ? 0" +
         ": (b('tmeanC') > 6.0) && (b('tmeanC') < 12.0) ? (b('tmeanC') * 0.0833)" +
-        ": 1").clip(geometry)
+        ": 1").clip(geometry).rename('rain_frac')
 
     return ee.Image(rain_frac).double()
 
@@ -126,7 +126,7 @@ def vegET_model(daily_imageColl, bbox):
 # TODO: Update docstring
     def daily_vegET_calc(daily_img, outputs_list):
         """
-        Function to run imageCollection.iterate(). Takes latest value from swi_list as previous
+        Function to run imageCollection.iterate(). Takes latest value from outputs_list as previous
             time-step SWI, current day whc_image and daily_image
         :param swi_list:
         :param whc_image:
@@ -145,7 +145,7 @@ def vegET_model(daily_imageColl, bbox):
         effective_precip = eff_intercept_precip(daily_img)
 
         # Calculate amount of effective precipitation as rain
-        rain = rain_frac.multiply(effective_precip.select('effppt'))
+        rain = rain_frac.multiply(effective_precip.select('effppt')).rename('rain')
 
         # TODO: Double check this is ok. Essentially skips first run as is in the esri version
         # TODO: This will be combined with snowpack and swf at end of run to make new outputs_list append
@@ -165,7 +165,7 @@ def vegET_model(daily_imageColl, bbox):
                     'tmin': image.select('tminC')
                 }
             )
-            melt_rate = melt_rate.set('system:time_start', image.get('system:time_start'))
+            melt_rate = melt_rate.set('system:time_start', image.get('system:time_start')).rename('melt_rate')
             return melt_rate
 
         melt_rate = melt_rate_calc(daily_img)
@@ -237,13 +237,14 @@ def vegET_model(daily_imageColl, bbox):
 
             srf = srf_input_img.expression(
                 "(b('rf') <= b('sat_fc')) ? (b('rf') * b('rf_coeff'))" +
-                ": (b('rf') - b('sat_fc')) + b('rf_coeff') * b('sat_fc')").clip(geometry)
+                ": (b('rf') - b('sat_fc')) + b('rf_coeff') * b('sat_fc')").clip(geometry).rename('srf')
             return srf
 
         srf = srf_calc(rf, sat_fc, rf_coeff, bbox)
 
+
         # Deep drainage
-        ddrain = rf.subtract(srf).double()
+        ddrain = rf.subtract(srf).double().rename('ddrain')
 
 
 # TODO: Verify if this is still needed
@@ -270,22 +271,25 @@ def vegET_model(daily_imageColl, bbox):
         # rfi = rfi_calc(swi_current, whc_grid_img)
 
         etasw1A = ee.Image(daily_img.select('ndvi').multiply(VARA).add(VARB)).multiply(daily_img.select(
-            'eto'))
-        etasw1B = ee.Image(daily_img.select('ndvi').multiply(VARA).multiply(daily_img.select('eto')))
+            'eto')).rename('etasw1A')
+        etasw1B = ee.Image(daily_img.select('ndvi').multiply(VARA).multiply(daily_img.select('eto'))).rename('etasw1B')
 
         # TODO: consider ee.Algorithms.If() for conditional statements
-        # DS This may fail since it's calling on values in multiple images
-        etasw1 = etasw1A.where(daily_img.select('ndvi').gt(0.4), etasw1B)
+        # If ndvi is > 0.4, return etasw1A pixel value, otherwise, return etasw1B
+        etasw1 = etasw1B.where(daily_img.select('ndvi').gt(0.4), etasw1A).rename('etasw1')
 
-        etasw2 = etasw1.multiply(swi_current.divide(whc_grid_img.multiply(0.5)))
-        etasw3 = etasw1.where(swi_current.gt(whc_grid_img.multiply(0.5)), etasw2)
-        etasw4 = swi_current.where(etasw3.gt(swi_current), etasw3)
-        etasw = whc_grid_img.where(etasw4.gt(whc_grid_img), etasw4)
+        etasw2 = etasw1.multiply(swi_current.divide(whc_grid_img.multiply(0.5))).rename('etasw2')
+        # use etasw1 pixel when swi_current > whc*0.5, use etasw2 pixel otherwise
+        etasw3 = etasw2.where(swi_current.gt(whc_grid_img.multiply(0.5)), etasw1).rename('etasw3')
+        # use swi_current pixel where etasw3 > swi_current, use etasw3 pixel otherwise
+        etasw4 = etasw3.where(etasw3.gt(swi_current), swi_current).rename('etasw4')
+        # use whc pixel where etasw4 is > whc, use etasw4 otherwise
+        etasw = etasw4.where(etasw4.gt(whc_grid_img), whc_grid_img).rename('etasw')
 
-        swf1 = swi_current.subtract(etasw)
-        bigswi = ee.Image(whc_grid_img.subtract(etasw))
+        swf1 = swi_current.subtract(etasw).rename('swf1')
+        bigswi = ee.Image(whc_grid_img.subtract(etasw)).rename('bigswi')
 
-        swf = bigswi.where(swi_current.gt(whc_grid_img), ee.Image(0.0).where(swf1.lt(0.0), swf1))
+        swf = bigswi.where(swi_current.gt(whc_grid_img), ee.Image(0.0).where(swf1.lt(0.0), swf1)).rename('swf')
 
         # TODO: This could be generalized with init_image_create
         def output_image_create(ref_img, swf_img, swe_img, snowpack_img):
