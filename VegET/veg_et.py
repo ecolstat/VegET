@@ -93,3 +93,5 @@ vegET_run = veg_et_model.vegET_model(ndvi_daily, polygon)
 #if __name__ == '__main__':
 #    pass
 
+# Show map example (NOTE: outdated visualization, but used for initial testing)
+#ee.mapclient.addToMap(vegET_run.first())2
