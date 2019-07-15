@@ -5,6 +5,7 @@ run iteratively over an Earth Engine imageCollection.
 
 import ee
 from VegET import utils
+from geetools import tools
 ee.Initialize()
 
 # TODO: update docstring
@@ -212,13 +213,13 @@ def vegET_model(daily_imageColl, bbox):
 
         snowpack = snowpack_calc(prev_outputs.select('snowpack'), swe, snow_melt)
 
-        swi_current = ee.Image(prev_outputs.select('swi').add(rain).add(snow_melt))
+        swi_current = ee.Image(prev_outputs.select('swi').add(rain).add(snow_melt)).rename('swi_current')
 
-        sat_fc = daily_img.select('soil_sat').subtract(daily_img.select('fcap'))
+        sat_fc = daily_img.select('soil_sat').subtract(daily_img.select('fcap')).rename('sat_fc')
 
-        rf1 = swi_current.subtract(whc_grid_img)
+        rf1 = swi_current.subtract(whc_grid_img).rename('rf1')
 
-        rf = rf1.where(rf1.lt(0.0), 0.0)
+        rf = rf1.where(rf1.lt(0.0), 0.0).rename('rf')
 
         def srf_calc(rf_img, sat_fc_img, rf_coeff, geometry):
             """
@@ -289,32 +290,58 @@ def vegET_model(daily_imageColl, bbox):
         swf1 = swi_current.subtract(etasw).rename('swf1')
         bigswi = ee.Image(whc_grid_img.subtract(etasw)).rename('bigswi')
 
-        swf = bigswi.where(swi_current.gt(whc_grid_img), ee.Image(0.0).where(swf1.lt(0.0), swf1)).rename('swf')
+        swf1_thresh = swf1.where(swf1.lt(0.0), 0.0).rename('swf_thresh')
+        swf = swf1_thresh.where(swi_current.gt(whc_grid_img), bigswi).rename('swf')
 
-        # TODO: This could be generalized with init_image_create
-        def output_image_create(ref_img, swf_img, swe_img, snowpack_img):
-            """
-            Combine images to create single output image with multiple bands
-            :param daily_img: ee.Image
-                reference image for timestamp
-            :param swf_img: ee.Image
-            :param swe_img: ee.Image
-            :param snowpack_img: ee.Image
-            :return: ee.Image
-            """
+        # # TODO: This has been replaced by geetools addMultiBands
+        # def output_image_create(ref_img, swf_img, swe_img, snowpack_img):
+        #     """
+        #     Combine images to create single output image with multiple bands
+        #     :param daily_img: ee.Image
+        #         reference image for timestamp
+        #     :param swf_img: ee.Image
+        #     :param swe_img: ee.Image
+        #     :param snowpack_img: ee.Image
+        #     :return: ee.Image
+        #     """
+        #
+        #     output_img = swf_img.addBands([swe_img, snowpack_img]).rename(['swi', 'swe', 'snowpack']) \
+        #         .set({
+        #         'system:index': ref_img.get('system:index'),
+        #         'system:time_start': ref_img.get('system:time_start')
+        #     })
+        #
+        #     return ee.Image(output_img)
+        #
+        # # Create output image
+        # output_image = output_image_create(daily_img, swf, swe, snowpack)
 
-            output_img = swf_img.addBands([swe_img, snowpack_img]).rename(['swi', 'swe', 'snowpack']) \
-                .set({
-                'system:index': ref_img.get('system:index'),
-                'system:time_start': ref_img.get('system:time_start')
-            })
+        results = ee.Image(tools.addMultiBands(daily_img,
+                            [rain_frac,
+                             effective_precip,
+                             rain,
+                             swe,
+                             melt_rate,
+                             snow_melt,
+                             snowpack,
+                             swi_current,
+                             sat_fc,
+                             rf1,
+                             rf,
+                             srf,
+                             etasw1A,
+                             etasw1B,
+                             etasw1,
+                             etasw2,
+                             etasw3,
+                             etasw4,
+                             etasw,
+                             swf1,
+                             bigswi,
+                             swf1_thresh,
+                             swf]))
 
-            return ee.Image(output_img)
-
-        # Create output image
-        output_image = output_image_create(daily_img, swf, swe, snowpack)
-
-        return ee.List(outputs_list).add(output_image)
+        return ee.List(outputs_list).add(results)
 
     return ee.ImageCollection(ee.List(daily_imageColl.iterate(daily_vegET_calc, outputs_list)))
 
