@@ -62,6 +62,26 @@ def addStaticBands(staticsImg):
     return wrap
 
 
+# Combine to single image. addMultiBands function from gee_tools
+# https://github.com/gee-community/gee_tools/blob/master/geetools/tools/image.py
+def addMultiBands(image, imageList):
+    """ Image.addBands for many images. All bands from all images will be
+    put together, so if there is one band with the same name in different
+    images, the first occurrence will keep the name and the rest will have a
+    number suffix ({band}_1, {band}_2, etc)
+    :param image: images to add bands
+    :param imageList: a list of images
+    :type imageList: list or ee.List
+    :rtype: ee.Image
+    """
+    def iteration(img, ini):
+        ini = ee.Image(ini)
+        img = ee.Image(img)
+        return ini.addBands(img)
+
+    return ee.List(imageList).iterate(iteration, image)
+
+
 def const_image(img, value):
     """
     Create an image with constant values at spatial scale of img

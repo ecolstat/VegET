@@ -5,7 +5,6 @@ run iteratively over an Earth Engine imageCollection.
 
 import ee
 from VegET import utils
-from geetools import tools
 ee.Initialize()
 
 # TODO: update docstring
@@ -25,8 +24,8 @@ def init_image_create(ref_imgColl, whc_img, effppt):
 
     # TODO: Adding swe is unnecessary since it is 0 valued for the initial state
     swi = ee.Image(utils.const_image(whc_img, 0.5)).multiply(effppt).add(swe)
-
-    dynamic_imgs = swi.addBands([swe, snowpack]).rename(['swi', 'swe', 'snowpack'])\
+    first_swf = ee.Image(utils.const_image(whc_img, 0.5)).multiply(effppt).rename('swf')
+    dynamic_imgs = swi.addBands([swe, snowpack, first_swf]).rename(['swi', 'swe', 'snowpack', 'swf'])\
         .set({
         'system:index': ref_imgColl.first().get('system:index'),
         'system:time_start': ref_imgColl.first().get('system:time_start')
@@ -150,7 +149,7 @@ def vegET_model(daily_imageColl, bbox):
 
         # TODO: Double check this is ok. Essentially skips first run as is in the esri version
         # TODO: This will be combined with snowpack and swf at end of run to make new outputs_list append
-        swe = ee.Image(const_img.subtract(rain_frac)).multiply(effective_precip.select('effppt'))
+        swe = ee.Image(const_img.subtract(rain_frac)).multiply(effective_precip.select('effppt')).rename('swe')
 
         def melt_rate_calc(image):
             """
@@ -213,7 +212,7 @@ def vegET_model(daily_imageColl, bbox):
 
         snowpack = snowpack_calc(prev_outputs.select('snowpack'), swe, snow_melt)
 
-        swi_current = ee.Image(prev_outputs.select('swi').add(rain).add(snow_melt)).rename('swi_current')
+        swi_current = ee.Image(prev_outputs.select('swf').add(rain).add(snow_melt)).rename('swi')
 
         sat_fc = daily_img.select('soil_sat').subtract(daily_img.select('fcap')).rename('sat_fc')
 
@@ -316,7 +315,7 @@ def vegET_model(daily_imageColl, bbox):
         # # Create output image
         # output_image = output_image_create(daily_img, swf, swe, snowpack)
 
-        results = ee.Image(tools.addMultiBands(daily_img,
+        results = ee.Image(utils.addMultiBands(daily_img,
                             [rain_frac,
                              effective_precip,
                              rain,
@@ -329,6 +328,7 @@ def vegET_model(daily_imageColl, bbox):
                              rf1,
                              rf,
                              srf,
+                             ddrain,
                              etasw1A,
                              etasw1B,
                              etasw1,
