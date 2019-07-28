@@ -39,6 +39,7 @@ g_season_end = 10
 #   and add check to ensure those bands are in the imageCollection, as well as calculations
 #   if necessary from raw bands
 # Get NDVI collection and clip to ROI
+# TODO: cloud masking
 # TODO: Check to see if this could be condensed into one call
 ndvi_coll = ee.ImageCollection("MODIS/006/MOD09Q1").filterDate(start_date, end_date)\
     .filter(ee.Filter.calendarRange(g_season_begin, g_season_end, 'month'))\
