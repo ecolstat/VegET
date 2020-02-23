@@ -1,10 +1,13 @@
 """
+First attempts at transitioning VegET code from ArcPy to Google Earth Engine.
 Defines the formula for running VegET on inputs. As defined here the function can be
 run iteratively over an Earth Engine imageCollection.
+VegET model code from G. Senay, S. Kagone, and M.Velpuri
+Openet code from openet (etdata.org) and (https://github.com/Open-ET)
 """
 
 import ee
-from VegET import utils
+from VegET import utils  # utils.py functions slightly modified from those in openet
 ee.Initialize()
 
 # TODO: update docstring

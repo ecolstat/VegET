@@ -1,6 +1,8 @@
 """
-Main file for running VegET model.
+Testing VegET runs in interactive Python console.
 
+VegET model code from G. Senay, S. Kagone, and M.Velpuri
+Openet code from openet (etdata.org) and (https://github.com/Open-ET)
 """
 
 from VegET import interpolate, daily_aggregate, utils, veg_et_model

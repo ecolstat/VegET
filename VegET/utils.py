@@ -1,7 +1,9 @@
 """
 Utility functions for formatting time-stamps and creating time / date information for imagecollections
-
 This code is largely structured on methods defined in openet.core.utils.py as of 06.04.19
+
+VegET model code from G. Senay, S. Kagone, and M.Velpuri
+Openet code from openet (etdata.org) and (https://github.com/Open-ET)
 """
 
 import calendar
@@ -93,7 +95,7 @@ def const_image(img, value):
         image with all pixel values set to value parameter
     """
     # TODO: change to check for collection vs image type to determine if .first() should be used.
-    const_img = ee.Image(img.select(0).multiply(value).double());
+    const_img = ee.Image(img.select(0).multiply(value).double())
     return const_img
 
 # TODO: This should be combined with const_image() function.
@@ -108,7 +110,7 @@ def const_imageColl(imgColl, value):
         image with all pixel values set to value parameter
     """
     # TODO: change to check for collection vs image type to determine if .first() should be used.
-    const_img = ee.Image(imgColl.first().select(0).multiply(value).double());
+    const_img = ee.Image(imgColl.first().select(0).multiply(value).double())
     return const_img
 
 
@@ -145,7 +147,7 @@ def getNDVI(image):
 
 
 # DS: Note: This is not used, but it's potentially a very useful function that may be used later
-# # TODO: Change to accept unknown number of secondayr_colls and band names as list
+# # TODO: Change to accept unknown number of secondary_colls and band names as list
 # def merge_colls(main_coll, secondary_coll, bands_2_add):
 #     """
 #     Function for band-wise merging of multiple ee.ImageCollections

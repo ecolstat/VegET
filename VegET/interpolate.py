@@ -7,6 +7,9 @@ linear interpolation as of 06.04.19
 The way this is currently written the source imageCollection (e.g., 8-day NDVI) must be a 'global'
 dataset. No processes are included for mosaicking multiple images together for dates. This could be
 added though, and openet.core.interp.py has methods for this that could be brought over.
+
+VegET model code from G. Senay, S. Kagone, and M.Velpuri
+Openet code from openet (etdata.org) and (https://github.com/Open-ET)
 """
 
 from .utils import millis, date_0utc, add_date_band
@@ -44,7 +47,7 @@ def daily(target_coll, source_coll, interp_days=16, interp_method='linear'):
             an image collection and can take only one input parameter (i.e., an image from the target_coll)
             """
 
-            # TODO: try to keep all bands from tartet_image if useful to do so
+            # TODO: try to keep all bands from target_image if useful to do so
             target_image = ee.Image(image).double()
             target_date = ee.Date(image.get('system:time_start'))
 
@@ -57,7 +60,7 @@ def daily(target_coll, source_coll, interp_days=16, interp_method='linear'):
             #    qm image collections in the event that the collections are empty, and for
             #    the beginning / end of the time-series
             bands = source_coll.first().bandNames()
-            # TODO: make sure these time offsets are doing what is expected regarding exlcusion
+            # TODO: make sure these time offsets are doing what is expected regarding exclusion
             prev_qm_mask = ee.Image.constant(ee.List.repeat(1, bands.length())) \
                 .double().rename(bands).updateMask(0) \
                 .set({

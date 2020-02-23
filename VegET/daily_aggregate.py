@@ -3,6 +3,9 @@ Functions for aggregating sub-daily time-step imageCollections to daily time-ste
 
 This code is largely structured on the openet.core.interp.py description of
 aggregate_func() as of 06.04.19
+
+VegET model code from G. Senay, S. Kagone, and M.Velpuri
+Openet code from openet (etdata.org) and (https://github.com/Open-ET)
 """
 
 from VegET import interpolate
